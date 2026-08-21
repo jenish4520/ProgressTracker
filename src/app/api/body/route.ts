@@ -5,7 +5,7 @@ import { bodyEntries } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { fail, handler, ok, parseBody } from "@/lib/api";
 import { bodyEntrySchema } from "@/lib/validation";
-import { addDays, isValidIsoDate, today } from "@/lib/dates";
+import { addDays, isValidIsoDate, todayInZone } from "@/lib/dates";
 import { loadEnergyState } from "@/server/energy";
 
 export async function GET(request: Request): Promise<NextResponse> {
@@ -17,7 +17,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const entries = await db
       .select()
       .from(bodyEntries)
-      .where(and(eq(bodyEntries.userId, user.id), gte(bodyEntries.date, addDays(today(), -days))))
+      .where(and(eq(bodyEntries.userId, user.id), gte(bodyEntries.date, addDays(todayInZone(user.timezone), -days))))
       .orderBy(desc(bodyEntries.date));
 
     const state = await loadEnergyState(user);

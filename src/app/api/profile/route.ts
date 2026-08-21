@@ -35,6 +35,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
         heightCm: users.heightCm,
         activityLevel: users.activityLevel,
         unitSystem: users.unitSystem,
+        timezone: users.timezone,
         onboardedAt: users.onboardedAt,
       });
 

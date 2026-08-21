@@ -82,6 +82,9 @@ const DEFAULT_STRENGTH_MET = 5.0;
 /** A forgotten "finish workout" tap should not bill you for a 9 hour session. */
 const MAX_SESSION_MINUTES = 240;
 
+/** Assumed minutes per working set when the recorded clock is unusable. */
+const MINUTES_PER_SET = 3;
+
 export interface BurnInput {
   sets: SetLike[];
   exercises: Map<string, ExerciseMeta>;
@@ -138,10 +141,17 @@ export function estimateCaloriesBurned({
   }
 
   const capped = Math.min(sessionMinutes ?? 0, MAX_SESSION_MINUTES);
-  // With no clock running, fall back to a conservative 3 min per working set
-  // (the set itself plus its rest).
-  const assumed = strengthSetCount * 3;
-  const totalMinutes = capped > 0 ? capped : cardioMinutes + assumed;
+
+  // Conservative fallback: ~3 minutes per working set, covering the set plus
+  // its rest.
+  const assumed = cardioMinutes + strengthSetCount * MINUTES_PER_SET;
+
+  // A recorded duration far too short for the work done means the clock is
+  // wrong, not that ten sets took forty seconds — a workout entered after the
+  // fact, or one where "finish" was tapped straight after "start". Trusting it
+  // would report 0 kcal for a real session.
+  const implausible = capped > 0 && strengthSetCount > 0 && capped < strengthSetCount;
+  const totalMinutes = capped > 0 && !implausible ? capped : assumed;
   const strengthMinutes = Math.max(0, totalMinutes - cardioMinutes);
 
   const strengthMet =

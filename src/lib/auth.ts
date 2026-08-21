@@ -38,6 +38,7 @@ export interface SessionUser {
   heightCm: number | null;
   activityLevel: (typeof users.$inferSelect)["activityLevel"];
   unitSystem: (typeof users.$inferSelect)["unitSystem"];
+  timezone: string;
   onboardedAt: Date | null;
   isAdmin: boolean;
 }
@@ -83,6 +84,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       heightCm: users.heightCm,
       activityLevel: users.activityLevel,
       unitSystem: users.unitSystem,
+      timezone: users.timezone,
       onboardedAt: users.onboardedAt,
       isAdmin: users.isAdmin,
     })

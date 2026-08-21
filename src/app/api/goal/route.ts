@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { handler, ok, parseBody } from "@/lib/api";
 import { goalSchema } from "@/lib/validation";
 import { loadEnergyState } from "@/server/energy";
-import { today } from "@/lib/dates";
+import { todayInZone } from "@/lib/dates";
 
 export async function GET(): Promise<NextResponse> {
   return handler(async () => {
@@ -52,7 +52,7 @@ export async function PUT(request: Request): Promise<NextResponse> {
           rateKgPerWeek: body.type === "maintain" ? 0 : body.rateKgPerWeek,
           startWeightKg: body.startWeightKg ?? state.trendWeightKg ?? null,
           targetWeightKg: body.targetWeightKg ?? null,
-          startDate: today(),
+          startDate: todayInZone(user.timezone),
           calorieOverride: body.calorieOverride ?? null,
           proteinOverrideG: body.proteinOverrideG ?? null,
           fatOverrideG: body.fatOverrideG ?? null,

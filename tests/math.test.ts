@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { bmr, tdeeFromFormula, calorieTarget, macroTargets, estimateAdaptiveTdee, maxSafeRate } from "../src/lib/nutrition.ts";
 import { buildTrend, rateKgPerWeek, projectTarget, currentTrendWeight, KCAL_PER_KG } from "../src/lib/trend.ts";
 import { estimateOneRepMax, totalVolumeKg, estimateCaloriesBurned, workingSetCount, type SetLike, type ExerciseMeta } from "../src/lib/training.ts";
-import { addDays, daysBetween, ageOn, toIsoDate, dateRange } from "../src/lib/dates.ts";
+import { addDays, daysBetween, ageOn, toIsoDate, dateRange, todayInZone, formatDayLabel, formatDayShort, formatDayWithWeekday, formatDateMedium, formatDateLong } from "../src/lib/dates.ts";
 import { displayWeight, storeWeight, formatRate } from "../src/lib/units.ts";
 
 /* ---------------------------- energy engine ---------------------------- */
@@ -199,6 +199,26 @@ test("calories burned follows the MET formula", () => {
   assert.ok(heavier.kcal > est.kcal);
 });
 
+test("an implausibly short clock falls back to an estimate rather than zero", () => {
+  const exercises = new Map<string, ExerciseMeta>([
+    ["a", { id: "a", name: "Squat", kind: "strength", met: 5, isBodyweight: false }],
+  ]);
+  // 9 working sets recorded as a 12-second session: the clock is wrong (logged
+  // after the fact, or "finish" tapped right after "start"). Reporting 0 kcal
+  // for real work done is worse than estimating from the sets.
+  const sets: SetLike[] = Array.from({ length: 9 }, () => ({
+    exerciseId: "a", reps: 8, weightKg: 100, isWarmup: false, completed: true, durationSeconds: null, distanceM: null,
+  }));
+  const est = estimateCaloriesBurned({ sets, exercises, bodyweightKg: 80, sessionMinutes: 0.2 });
+
+  assert.ok(est.kcal > 0, "must not report zero for nine completed sets");
+  assert.equal(est.strengthMinutes, 27, "falls back to ~3 min per set");
+
+  // A believable duration is still trusted as recorded.
+  const real = estimateCaloriesBurned({ sets, exercises, bodyweightKg: 80, sessionMinutes: 45 });
+  assert.equal(real.strengthMinutes, 45);
+});
+
 test("a forgotten timer cannot bill a nine-hour session", () => {
   const exercises = new Map<string, ExerciseMeta>([
     ["a", { id: "a", name: "Squat", kind: "strength", met: 5, isBodyweight: false }],
@@ -240,6 +260,78 @@ test("age accounts for whether the birthday has happened yet", () => {
   assert.equal(ageOn("2004-01-15", "2026-08-21"), 22);
   assert.equal(ageOn("2004-12-15", "2026-08-21"), 21, "birthday later this year");
   assert.equal(ageOn("2004-08-21", "2026-08-21"), 22, "birthday today");
+});
+
+test("the user's day is resolved in their own timezone, not the server's", () => {
+  // 23:30 UTC is already tomorrow in Berlin. A server running in UTC would
+  // otherwise file a late-night snack against the wrong day's calorie budget.
+  const lateUtc = new Date("2026-08-21T23:30:00Z");
+  assert.equal(todayInZone("UTC", lateUtc), "2026-08-21");
+  assert.equal(todayInZone("Europe/Berlin", lateUtc), "2026-08-22");
+
+  // And the mirror case: 00:30 in Berlin is still the previous day in UTC.
+  const earlyBerlin = new Date("2026-08-21T22:30:00Z"); // 00:30 on the 22nd, CEST
+  assert.equal(todayInZone("Europe/Berlin", earlyBerlin), "2026-08-22");
+  assert.equal(todayInZone("America/Los_Angeles", earlyBerlin), "2026-08-21");
+});
+
+test("an unknown timezone degrades instead of throwing", () => {
+  const at = new Date("2026-08-21T12:00:00Z");
+  assert.match(todayInZone("Not/AZone", at), /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test("day labels are relative to an explicit reference, not an ambient clock", () => {
+  // The server and the browser must reach the same label for the same day;
+  // passing the reference in is what guarantees that.
+  assert.equal(formatDayLabel("2026-08-21", "2026-08-21"), "Today");
+  assert.equal(formatDayLabel("2026-08-20", "2026-08-21"), "Yesterday");
+  assert.equal(formatDayLabel("2026-08-22", "2026-08-21"), "Tomorrow");
+
+  // Same day, different reference -> different label. This is precisely the
+  // divergence that produced a hydration mismatch when each side computed
+  // "today" for itself.
+  assert.equal(formatDayLabel("2026-08-21", "2026-08-22"), "Yesterday");
+  assert.notEqual(
+    formatDayLabel("2026-08-21", "2026-08-21"),
+    formatDayLabel("2026-08-21", "2026-08-22"),
+  );
+
+  // Distant days format absolutely and identically regardless of reference.
+  assert.equal(formatDayLabel("2026-07-04", "2026-08-21"), formatDayLabel("2026-07-04", "2026-08-22"));
+});
+
+test("dates format identically on any runtime, without Intl", () => {
+  // Node and Chromium ship different ICU builds: en-GB "weekday day month"
+  // renders "Sat 8 Aug" on Node but "Sat, 8 Aug" in Chromium. Both render this
+  // text during SSR and hydration, so the formatter must not depend on Intl.
+  assert.equal(formatDayWithWeekday("2026-08-08"), "Sat 8 Aug");
+  assert.equal(formatDayShort("2026-08-08"), "8 Aug");
+  assert.equal(formatDateMedium("2026-08-08"), "8 August 2026");
+  assert.equal(formatDateLong("2026-08-08"), "Saturday, 8 August");
+  assert.equal(formatDayLabel("2026-08-08", "2026-09-01"), "Sat 8 Aug");
+});
+
+test("date-only values do not shift a day west of UTC", () => {
+  // new Date("2026-08-08") is UTC midnight, which renders as 7 August for
+  // anyone at a negative offset. Building from components avoids that.
+  const original = process.env.TZ;
+  try {
+    process.env.TZ = "America/Los_Angeles";
+    assert.equal(formatDayShort("2026-08-08"), "8 Aug");
+    assert.equal(formatDateMedium("2026-01-01"), "1 January 2026");
+    process.env.TZ = "Pacific/Kiritimati"; // UTC+14, the other extreme
+    assert.equal(formatDayShort("2026-08-08"), "8 Aug");
+  } finally {
+    if (original === undefined) delete process.env.TZ;
+    else process.env.TZ = original;
+  }
+});
+
+test("weekday and month tables are correct across the year", () => {
+  assert.equal(formatDayWithWeekday("2026-01-01"), "Thu 1 Jan");
+  assert.equal(formatDayWithWeekday("2026-12-31"), "Thu 31 Dec");
+  assert.equal(formatDayWithWeekday("2024-02-29"), "Thu 29 Feb", "leap day");
+  assert.equal(formatDateMedium("2026-06-15"), "15 June 2026");
 });
 
 /* -------------------------------- units -------------------------------- */

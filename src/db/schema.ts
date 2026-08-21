@@ -54,6 +54,9 @@ export const users = pgTable(
     activityLevel: text("activity_level").$type<ActivityLevel>().default("light"),
 
     unitSystem: text("unit_system").$type<UnitSystem>().notNull().default("metric"),
+    // IANA zone, e.g. "Europe/Berlin". Detected from the browser and used by
+    // the server so both agree on which calendar day "now" belongs to.
+    timezone: text("timezone").notNull().default("UTC"),
     onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
     isAdmin: boolean("is_admin").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

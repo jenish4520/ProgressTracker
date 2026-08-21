@@ -38,6 +38,19 @@ export const profileSchema = z.object({
   heightCm: z.number().min(50).max(260).optional(),
   activityLevel: z.enum(["sedentary", "light", "moderate", "very", "extra"]).optional(),
   unitSystem: z.enum(["metric", "imperial"]).optional(),
+  // Validated as a real IANA zone rather than accepting arbitrary text.
+  timezone: z
+    .string()
+    .max(64)
+    .refine((tz) => {
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Unknown timezone")
+    .optional(),
 });
 
 export const goalSchema = z.object({

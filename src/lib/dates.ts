@@ -9,9 +9,31 @@
 
 export type IsoDate = string;
 
-/** Today in the *viewer's* timezone, not UTC. */
+/** Today according to the runtime's own clock and zone. */
 export function today(): IsoDate {
   return toIsoDate(new Date());
+}
+
+/**
+ * Today in a specific IANA timezone.
+ *
+ * The server runs in UTC but the user does not. Asking "what day is it for
+ * this person" has to name the zone, otherwise a 00:30 entry in Berlin lands
+ * on the previous day's calorie budget. en-CA is used purely because it
+ * formats as YYYY-MM-DD.
+ */
+export function todayInZone(timeZone: string, now: Date = new Date()): IsoDate {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(now);
+  } catch {
+    // An unknown zone must not take the whole app down.
+    return toIsoDate(now);
+  }
 }
 
 export function toIsoDate(d: Date): IsoDate {
@@ -61,11 +83,61 @@ export function dateRange(start: IsoDate, end: IsoDate): IsoDate[] {
   return out;
 }
 
-export function formatDayLabel(s: IsoDate, locale = "en-GB"): string {
+/**
+ * Deterministic English date names.
+ *
+ * Intl is deliberately avoided for rendered dates. Node and the browser ship
+ * different ICU builds, and en-GB "weekday day month" formats as "Sat 8 Aug"
+ * on Node but "Sat, 8 Aug" in Chromium — enough to fail hydration on text the
+ * server and client both render. Fixed tables give the same string everywhere.
+ */
+const WEEKDAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const WEEKDAYS_LONG = [
+  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+] as const;
+const MONTHS_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+] as const;
+const MONTHS_LONG = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+] as const;
+
+/** "8 Aug" */
+export function formatDayShort(s: IsoDate): string {
   const d = fromIsoDate(s);
-  const t = today();
-  if (s === t) return "Today";
-  if (s === addDays(t, -1)) return "Yesterday";
-  if (s === addDays(t, 1)) return "Tomorrow";
-  return d.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" });
+  return `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+}
+
+/** "Sat 8 Aug" */
+export function formatDayWithWeekday(s: IsoDate): string {
+  const d = fromIsoDate(s);
+  return `${WEEKDAYS_SHORT[d.getDay()]} ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+}
+
+/** "8 August 2026" */
+export function formatDateMedium(s: IsoDate): string {
+  const d = fromIsoDate(s);
+  return `${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/** "Saturday, 8 August" */
+export function formatDateLong(s: IsoDate): string {
+  const d = fromIsoDate(s);
+  return `${WEEKDAYS_LONG[d.getDay()]}, ${d.getDate()} ${MONTHS_LONG[d.getMonth()]}`;
+}
+
+/**
+ * Human day label.
+ *
+ * `todayRef` is explicit rather than derived internally: this runs during
+ * server rendering *and* during hydration, and the two must reach the same
+ * answer. Letting each side compute its own "today" is precisely how "Today"
+ * on the server becomes "Yesterday" in the browser.
+ */
+export function formatDayLabel(s: IsoDate, todayRef: IsoDate = today()): string {
+  if (s === todayRef) return "Today";
+  if (s === addDays(todayRef, -1)) return "Yesterday";
+  if (s === addDays(todayRef, 1)) return "Tomorrow";
+  return formatDayWithWeekday(s);
 }

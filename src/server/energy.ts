@@ -3,7 +3,7 @@ import { and, eq, gte, sql as raw } from "drizzle-orm";
 import { db } from "@/db";
 import { bodyEntries, foodLogEntries, goals } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth";
-import { addDays, ageOn, today, type IsoDate } from "@/lib/dates";
+import { addDays, ageOn, todayInZone, type IsoDate } from "@/lib/dates";
 import {
   bmr as calcBmr,
   calorieTarget,
@@ -52,7 +52,10 @@ export interface EnergyState {
  * against the goal), so computing them in separate places would mean either
  * duplicated queries or numbers that disagree between two screens.
  */
-export async function loadEnergyState(user: SessionUser, on: IsoDate = today()): Promise<EnergyState> {
+export async function loadEnergyState(
+  user: SessionUser,
+  on: IsoDate = todayInZone(user.timezone),
+): Promise<EnergyState> {
   // A year of history is plenty for charts while staying a small result set.
   const since = addDays(on, -365);
 

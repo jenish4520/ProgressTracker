@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="ProgressTracker">
+  <rect width="512" height="512" rx="112" fill="#2a78d6"/>
+  <!-- An upward trend through plotted points: the thing the app is for. -->
+  <polyline points="104,340 200,268 288,300 408,168" fill="none" stroke="#ffffff"
+            stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="104" cy="340" r="20" fill="#ffffff"/>
+  <circle cx="200" cy="268" r="20" fill="#ffffff"/>
+  <circle cx="288" cy="300" r="20" fill="#ffffff"/>
+  <circle cx="408" cy="168" r="26" fill="#ffffff"/>
+</svg>

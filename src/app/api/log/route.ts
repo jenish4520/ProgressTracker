@@ -5,7 +5,7 @@ import { foodLogEntries, foods } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { fail, handler, ok, parseBody } from "@/lib/api";
 import { foodLogSchema } from "@/lib/validation";
-import { isValidIsoDate, today } from "@/lib/dates";
+import { isValidIsoDate, todayInZone } from "@/lib/dates";
 import { macrosForQuantity } from "@/lib/food";
 import { loadDayNutrition, loadEnergyState } from "@/server/energy";
 
@@ -13,7 +13,7 @@ import { loadDayNutrition, loadEnergyState } from "@/server/energy";
 export async function GET(request: Request): Promise<NextResponse> {
   return handler(async () => {
     const user = await requireUser();
-    const date = new URL(request.url).searchParams.get("date") ?? today();
+    const date = new URL(request.url).searchParams.get("date") ?? todayInZone(user.timezone);
     if (!isValidIsoDate(date)) return fail("A valid date is required.", 422);
 
     const [entries, totals, state] = await Promise.all([
