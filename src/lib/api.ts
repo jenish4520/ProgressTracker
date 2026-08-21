@@ -22,7 +22,7 @@ export function fail(error: string, status = 400, fields?: Record<string, string
  * otherwise repeat. Unexpected errors are logged server-side and reported
  * generically, so a stack trace or SQL detail never reaches the client.
  */
-export function handler<T>(fn: () => Promise<NextResponse<T>>): Promise<NextResponse> {
+export function handler(fn: () => Promise<NextResponse>): Promise<NextResponse> {
   return fn().catch((err: unknown) => {
     if (err instanceof UnauthorizedError) return fail("Please sign in", 401);
 

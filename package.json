@@ -11,7 +11,7 @@
     "db:seed": "tsx --env-file-if-exists=.env src/db/seed.ts",
     "db:reset": "tsx --env-file-if-exists=.env src/db/reset.ts",
     "invite": "tsx --env-file-if-exists=.env scripts/invite.ts",
-    "test": "node --import tsx --test tests/*.test.ts"
+    "test": "node --conditions=react-server --env-file-if-exists=.env --import tsx --test tests/*.test.ts tests/*.test.mts"
   },
   "dependencies": {
     "@zxing/browser": "^0.1.5",
